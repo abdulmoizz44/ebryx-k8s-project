@@ -45,8 +45,8 @@ jobs:
       id: build-image
       working-directory: ./app
       run: |
-        # Get full commit SHA as the primary tag
-        IMAGE_TAG=$GITHUB_SHA
+        # Get first 6 characters of commit SHA as the primary tag
+        IMAGE_TAG=${GITHUB_SHA:0:6}
         
         # Build Docker image with commit SHA as tag
         echo "Building Docker image with tag: $IMAGE_TAG"
@@ -74,7 +74,7 @@ jobs:
         # Start image scan on the commit SHA tagged image
         aws ecr start-image-scan \
           --repository-name $ECR_REPOSITORY \
-          --image-id imageTag=$GITHUB_SHA \
+          --image-id imageTag=${GITHUB_SHA:0:6} \
           --region $AWS_REGION
         
         echo "Image scan initiated for security vulnerabilities"
