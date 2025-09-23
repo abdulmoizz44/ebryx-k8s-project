@@ -208,26 +208,115 @@ jobs:
       with:
         mask-password: false
 
-    - name: Build, tag, and push image to Amazon ECR
+    - name: Build Docker image
       id: build-image
       working-directory: ./app
       run: |
         IMAGE_TAG=${GITHUB_SHA:0:6}
         
-        echo "Building Docker image with tag: $IMAGE_TAG"
+        echo "🔨 Building Docker image with tag: $IMAGE_TAG"
         docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
-        
         docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
         
-        echo "Pushing image with commit SHA: $IMAGE_TAG"
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        echo "Pushing latest tag..."
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-        
+        echo "✅ Docker image built successfully!"
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
         echo "image-latest=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
         echo "commit-sha=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    - name: Run Trivy vulnerability scanner (SARIF)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: '${{ env.ECR_REPOSITORY }}:${{ steps.build-image.outputs.commit-sha }}'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run Trivy vulnerability scanner (JSON report)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: '${{ env.ECR_REPOSITORY }}:${{ steps.build-image.outputs.commit-sha }}'
+        format: 'json'
+        output: 'trivy-report.json'
+      continue-on-error: true
+
+    - name: Run Trivy vulnerability scanner (Table format)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: '${{ env.ECR_REPOSITORY }}:${{ steps.build-image.outputs.commit-sha }}'
+        format: 'table'
+        exit-code: '1'
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+        severity: 'CRITICAL'
+
+    - name: Upload Trivy reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: trivy-vulnerability-reports
+        path: |
+          trivy-results.sarif
+          trivy-report.json
+
+    - name: Analyze Trivy scan results
+      run: |
+        echo "🔍 Analyzing Trivy vulnerability scan results..."
+        
+        if [ -f "trivy-report.json" ]; then
+          # Count vulnerabilities by severity
+          CRITICAL=$(cat trivy-report.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length')
+          HIGH=$(cat trivy-report.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length')
+          MEDIUM=$(cat trivy-report.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "MEDIUM")] | length')
+          LOW=$(cat trivy-report.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "LOW")] | length')
+          
+          echo "📊 Vulnerability Summary:"
+          echo "🔴 Critical: $CRITICAL"
+          echo "🟠 High: $HIGH"
+          echo "🟡 Medium: $MEDIUM"
+          echo "🟢 Low: $LOW"
+          
+          # Only fail on CRITICAL vulnerabilities
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "❌ CRITICAL vulnerabilities found! Cannot proceed to production."
+            echo "🔗 Check detailed reports in artifacts or GitHub Security tab"
+            echo "🚨 Pipeline will fail and images will NOT be pushed to ECR"
+            exit 1
+          else
+            echo "✅ No CRITICAL vulnerabilities found! Safe to proceed with push."
+            if [ "$HIGH" -gt 0 ]; then
+              echo "⚠️  Note: $HIGH HIGH severity vulnerabilities found (acceptable)"
+            fi
+            if [ "$MEDIUM" -gt 0 ]; then
+              echo "💡 Note: $MEDIUM MEDIUM severity vulnerabilities found (acceptable)"
+            fi
+            if [ "$LOW" -gt 0 ]; then
+              echo "ℹ️  Note: $LOW LOW severity vulnerabilities found (acceptable)"
+            fi
+            echo "📋 Summary: Critical($CRITICAL), High($HIGH), Medium($MEDIUM), Low($LOW)"
+            echo "🚀 Proceeding with ECR push and deployment..."
+          fi
+        else
+          echo "⚠️ Trivy report not found, proceeding with caution..."
+        fi
+
+    - name: Push images to Amazon ECR
+      if: success()
+      run: |
+        IMAGE_TAG=${GITHUB_SHA:0:6}
+        
+        echo "📦 Pushing images to ECR (security scan passed)..."
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        
+        echo "✅ Images pushed successfully to ECR!"
+        echo "📋 Image with tag: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+        echo "📋 Latest image: $ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
     - name: Install kubectl
       uses: azure/setup-kubectl@v3
