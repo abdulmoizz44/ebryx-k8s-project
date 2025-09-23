@@ -53,17 +53,6 @@ jobs:
         echo "image-latest=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
         echo "commit-sha=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    - name: Image scan
-      id: image-scan
-      continue-on-error: true
-      run: |
-        aws ecr start-image-scan \
-          --repository-name $ECR_REPOSITORY \
-          --image-id imageTag=${GITHUB_SHA:0:6} \
-          --region $AWS_REGION
-        
-        echo "Image scan initiated for security vulnerabilities"
-
     - name: Install kubectl
       uses: azure/setup-kubectl@v3
       with:
@@ -90,7 +79,8 @@ jobs:
         # Update the image tag in values.yaml and deploy
         helm upgrade --install flask-health-app . \
           --set image.tag=$IMAGE_TAG \
-          --namespace default \
+          --namespace flask-app \
+          --create-namespace \
           --wait \
           --timeout=300s
         
