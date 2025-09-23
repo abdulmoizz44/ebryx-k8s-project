@@ -28,7 +28,49 @@ jobs:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       with:
         projectBaseDir: ./app
-      continue-on-error: true  # Don't fail pipeline if SonarCloud fails
+
+    - name: SonarCloud Quality Gate Check
+      id: quality-gate
+      run: |
+        echo "⏳ Waiting for SonarCloud Quality Gate..."
+        
+        # Extract task URL from scanner work directory
+        TASK_URL=$(cat ./app/.scannerwork/report-task.txt | grep ceTaskUrl | cut -d'=' -f2)
+        echo "Task URL: $TASK_URL"
+        
+        # Wait for analysis to complete (max 5 minutes)
+        for i in {1..60}; do
+          sleep 5
+          TASK_STATUS=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "$TASK_URL" | jq -r '.task.status')
+          echo "Analysis status: $TASK_STATUS (attempt $i/60)"
+          
+          if [ "$TASK_STATUS" = "SUCCESS" ]; then
+            echo "✅ Analysis completed successfully"
+            break
+          elif [ "$TASK_STATUS" = "FAILED" ] || [ "$TASK_STATUS" = "CANCELLED" ]; then
+            echo "❌ Analysis failed with status: $TASK_STATUS"
+            exit 1
+          fi
+          
+          if [ $i -eq 60 ]; then
+            echo "❌ Timeout waiting for analysis to complete"
+            exit 1
+          fi
+        done
+        
+        # Get project status and Quality Gate
+        PROJECT_STATUS_URL="https://sonarcloud.io/api/qualitygates/project_status?projectKey=abdulmoizz44_ebryx-k8s-project"
+        QUALITY_GATE_STATUS=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "$PROJECT_STATUS_URL" | jq -r '.projectStatus.status')
+        
+        echo "🎯 Quality Gate Status: $QUALITY_GATE_STATUS"
+        
+        if [ "$QUALITY_GATE_STATUS" = "OK" ]; then
+          echo "✅ Quality Gate PASSED! Proceeding with deployment..."
+        else
+          echo "❌ Quality Gate FAILED! Status: $QUALITY_GATE_STATUS"
+          echo "🔗 Check details at: https://sonarcloud.io/project/overview?id=abdulmoizz44_ebryx-k8s-project"
+          exit 1
+        fi
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
