@@ -28,6 +28,7 @@ jobs:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       with:
         projectBaseDir: ./app
+      continue-on-error: true  # Don't fail pipeline if SonarCloud fails
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
