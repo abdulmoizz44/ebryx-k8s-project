@@ -34,40 +34,69 @@ jobs:
       run: |
         echo "⏳ Waiting for SonarCloud Quality Gate..."
         
-        # Extract task URL from scanner work directory
-        TASK_URL=$(cat ./app/.scannerwork/report-task.txt | grep ceTaskUrl | cut -d'=' -f2)
-        echo "Task URL: $TASK_URL"
-        
-        # Wait for analysis to complete (max 5 minutes)
-        for i in {1..60}; do
-          sleep 5
-          TASK_STATUS=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "$TASK_URL" | jq -r '.task.status')
-          echo "Analysis status: $TASK_STATUS (attempt $i/60)"
+        # Debug: Check if report-task.txt exists and show content
+        if [ -f "./app/.scannerwork/report-task.txt" ]; then
+          echo "📋 Report task file content:"
+          cat ./app/.scannerwork/report-task.txt
+          echo ""
           
-          if [ "$TASK_STATUS" = "SUCCESS" ]; then
-            echo "✅ Analysis completed successfully"
-            break
-          elif [ "$TASK_STATUS" = "FAILED" ] || [ "$TASK_STATUS" = "CANCELLED" ]; then
-            echo "❌ Analysis failed with status: $TASK_STATUS"
+          # Extract task ID more carefully
+          TASK_ID=$(grep "ceTaskId=" ./app/.scannerwork/report-task.txt | cut -d'=' -f2)
+          echo "🆔 Task ID: $TASK_ID"
+          
+          if [ -n "$TASK_ID" ]; then
+            TASK_URL="https://sonarcloud.io/api/ce/task?id=$TASK_ID"
+            echo "🔗 Task URL: $TASK_URL"
+            
+            # Wait for analysis to complete
+            for i in {1..60}; do
+              sleep 10
+              echo "⏳ Checking analysis status (attempt $i/60)..."
+              
+              RESPONSE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "$TASK_URL")
+              TASK_STATUS=$(echo "$RESPONSE" | jq -r '.task.status // "PENDING"')
+              
+              echo "📊 Analysis status: $TASK_STATUS"
+              
+              if [ "$TASK_STATUS" = "SUCCESS" ]; then
+                echo "✅ Analysis completed successfully!"
+                break
+              elif [ "$TASK_STATUS" = "FAILED" ] || [ "$TASK_STATUS" = "CANCELLED" ]; then
+                echo "❌ Analysis failed with status: $TASK_STATUS"
+                echo "Response: $RESPONSE"
+                exit 1
+              fi
+              
+              if [ $i -eq 60 ]; then
+                echo "❌ Timeout waiting for analysis to complete"
+                exit 1
+              fi
+            done
+          else
+            echo "❌ Could not extract task ID from report"
             exit 1
           fi
-          
-          if [ $i -eq 60 ]; then
-            echo "❌ Timeout waiting for analysis to complete"
-            exit 1
-          fi
-        done
+        else
+          echo "❌ Report task file not found"
+          exit 1
+        fi
         
-        # Get project status and Quality Gate
+        # Check Quality Gate
+        echo "🎯 Checking Quality Gate status..."
+        sleep 5  # Give SonarCloud time to process
+        
         PROJECT_STATUS_URL="https://sonarcloud.io/api/qualitygates/project_status?projectKey=abdulmoizz44_ebryx-k8s-project"
-        QUALITY_GATE_STATUS=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "$PROJECT_STATUS_URL" | jq -r '.projectStatus.status')
+        QG_RESPONSE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "$PROJECT_STATUS_URL")
+        QUALITY_GATE_STATUS=$(echo "$QG_RESPONSE" | jq -r '.projectStatus.status // "ERROR"')
         
         echo "🎯 Quality Gate Status: $QUALITY_GATE_STATUS"
         
         if [ "$QUALITY_GATE_STATUS" = "OK" ]; then
-          echo "✅ Quality Gate PASSED! Proceeding with deployment..."
+          echo "✅ Quality Gate PASSED! 🎉"
+          echo "🚀 Proceeding with deployment..."
         else
           echo "❌ Quality Gate FAILED! Status: $QUALITY_GATE_STATUS"
+          echo "📄 Full response: $QG_RESPONSE"
           echo "🔗 Check details at: https://sonarcloud.io/project/overview?id=abdulmoizz44_ebryx-k8s-project"
           exit 1
         fi
