@@ -60,6 +60,7 @@ jobs:
           --enableRetired
           --enableExperimental
           --failOnCVSS 7
+          --disableOssIndex
           --out reports
           --log reports/dependency-check.log
 
