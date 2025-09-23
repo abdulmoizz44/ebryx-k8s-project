@@ -212,17 +212,21 @@ jobs:
       id: build-image
       working-directory: ./app
       run: |
-        IMAGE_TAG=${GITHUB_SHA:0:6}
+        # Use short Git SHA for tagging (e.g., myapp:a1b2c3d)
+        SHORT_SHA=${GITHUB_SHA:0:7}
         
-        echo "🔨 Building Docker image with tag: $IMAGE_TAG"
-        docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
-        docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        echo "🔨 Building Docker image with short Git SHA tag: $SHORT_SHA"
+        docker build -t $ECR_REPOSITORY:$SHORT_SHA .
+        docker tag $ECR_REPOSITORY:$SHORT_SHA $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA
+        docker tag $ECR_REPOSITORY:$SHORT_SHA $ECR_REGISTRY/$ECR_REPOSITORY:latest
         
         echo "✅ Docker image built successfully!"
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "📋 Local image: $ECR_REPOSITORY:$SHORT_SHA"
+        echo "📋 ECR image: $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA"
+        
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA" >> $GITHUB_OUTPUT
         echo "image-latest=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
-        echo "commit-sha=$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "commit-sha=$SHORT_SHA" >> $GITHUB_OUTPUT
 
     - name: Run Trivy vulnerability scanner (SARIF)
       uses: aquasecurity/trivy-action@master
@@ -302,14 +306,16 @@ jobs:
     - name: Push images to Amazon ECR
       if: success()
       run: |
-        IMAGE_TAG=${GITHUB_SHA:0:6}
+        # Use short Git SHA for tagging (e.g., k8s-assessment:a1b2c3d)
+        SHORT_SHA=${GITHUB_SHA:0:7}
         
         echo "📦 Pushing images to ECR (security scan passed)..."
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        echo "🏷️ Pushing with short Git SHA: $SHORT_SHA"
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
         
         echo "✅ Images pushed successfully to ECR!"
-        echo "📋 Image with tag: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+        echo "📋 Image with SHA tag: $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA"
         echo "📋 Latest image: $ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
     - name: Install kubectl
@@ -329,21 +335,23 @@ jobs:
 
     - name: Deploy to EKS using Helm
       run: |
-        IMAGE_TAG=${GITHUB_SHA:0:6}
+        # Use short Git SHA for deployment (e.g., k8s-assessment:a1b2c3d)
+        SHORT_SHA=${GITHUB_SHA:0:7}
         
-        echo "Deploying with image tag: $IMAGE_TAG"
+        echo "🚀 Deploying with short Git SHA tag: $SHORT_SHA"
         
         cd simple-helm/flask-app
         
         # Update the image tag in values.yaml and deploy
         helm upgrade --install flask-health-app . \
-          --set image.tag=$IMAGE_TAG \
+          --set image.tag=$SHORT_SHA \
           --namespace flask-app \
           --create-namespace \
           --wait \
           --timeout=300s
         
-        echo "Deployment completed successfully!"
+        echo "✅ Deployment completed successfully!"
+        echo "📋 Deployed image: $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA"
         
         # Verify deployment
         kubectl get pods -l app=flask-health-app
