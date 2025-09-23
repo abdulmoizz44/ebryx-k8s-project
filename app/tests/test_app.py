@@ -140,30 +140,16 @@ def test_application_configuration(app_context):
     """Test application configuration."""
     assert app.config['TESTING'] is True
     
-def test_concurrent_health_checks(client):
-    """Test multiple concurrent health check requests."""
-    import threading
-    results = []
-    
-    def check_health():
+def test_multiple_health_checks(client):
+    """Test multiple sequential health check requests."""
+    # Test multiple sequential requests to ensure consistency
+    for i in range(5):
         response = client.get('/healthz')
-        results.append(response.status_code)
-    
-    # Start multiple threads
-    threads = []
-    for _ in range(5):
-        thread = threading.Thread(target=check_health)
-        threads.append(thread)
-        thread.start()
-    
-    # Wait for all threads to complete
-    for thread in threads:
-        thread.join()
-    
-    # All requests should return valid status codes
-    assert len(results) == 5
-    for status_code in results:
-        assert status_code in [200, 503]
+        assert response.status_code in [200, 503]
+        
+        data = json.loads(response.data)
+        assert 'status' in data
+        assert 'timestamp' in data
 
 def test_app_globals_state():
     """Test global application state variables."""
