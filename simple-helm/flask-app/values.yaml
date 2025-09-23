@@ -42,3 +42,12 @@ hpa:
 ingress:
   enabled: true
   host: flask.yimo.world
+  tls:
+    enabled: true
+    secretName: flask-tls-secret
+
+# Cert Manager Configuration
+certManager:
+  enabled: true
+  issuerName: letsencrypt-prod
+  email: abdulmoizz4434@gmail.com

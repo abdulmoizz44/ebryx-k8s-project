@@ -89,3 +89,4 @@ jobs:
         # Verify deployment
         kubectl get pods -l app=flask-health-app
         kubectl get services flask-health-app
+

@@ -5,8 +5,18 @@ metadata:
   name: {{ .Values.appName }}-ingress
   labels:
     app: {{ .Values.appName }}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.certManager.issuerName }}
+    {{- end }}
 spec:
-  ingressClassName: nginx
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+  - hosts:
+    - {{ .Values.ingress.host }}
+    secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
   rules:
   - host: {{ .Values.ingress.host }}
     http:
@@ -15,7 +25,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: {{ .Values.appName }}
+            name: {{ .Values.appName }}-service
             port:
               number: {{ .Values.service.port }}
 {{- end }}
