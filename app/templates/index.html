@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask Health Check App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 Flask Health Check Application</h1>
+            <p class="subtitle">A simple web app with health monitoring endpoints</p>
+        </header>
+
+        <main>
+            <div class="status-card">
+                <h2>Application Status</h2>
+                <div class="status-info">
+                    <div class="status-item">
+                        <span class="label">Status:</span>
+                        <span class="value status-running">{{ app_status }}</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Current Time:</span>
+                        <span class="value">{{ current_time }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoints-section">
+                <h2>Health Check Endpoints</h2>
+                <div class="endpoints-grid">
+                    <div class="endpoint-card">
+                        <h3>Readiness Probe</h3>
+                        <p>Checks if the application is ready to serve traffic</p>
+                        <div class="endpoint-actions">
+                            <a href="/healthz" class="btn btn-primary" target="_blank">Check Readiness</a>
+                            <a href="/toggle-readiness" class="btn btn-secondary" target="_blank">Toggle State</a>
+                        </div>
+                        <code>/healthz</code>
+                    </div>
+                    
+                    <div class="endpoint-card">
+                        <h3>Liveness Probe</h3>
+                        <p>Checks if the application is alive and healthy</p>
+                        <div class="endpoint-actions">
+                            <a href="/failcheck" class="btn btn-primary" target="_blank">Check Liveness</a>
+                            <a href="/toggle-liveness" class="btn btn-secondary" target="_blank">Toggle State</a>
+                        </div>
+                        <code>/failcheck</code>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h2>About</h2>
+                <p>This Flask application demonstrates:</p>
+                <ul>
+                    <li>✅ Readiness probe endpoint (<code>/healthz</code>)</li>
+                    <li>✅ Liveness probe endpoint (<code>/failcheck</code>)</li>
+                    <li>✅ Modern responsive UI</li>
+                    <li>✅ Toggle endpoints for testing health states</li>
+                </ul>
+            </div>
+        </main>
+
+        <footer>
+            <p>Made with ❤️ using Flask</p>
+        </footer>
+    </div>
+
+    <script>
+        // Auto-refresh the page every 30 seconds to show updated time
+        setTimeout(() => {
+            location.reload();
+        }, 30000);
+    </script>
+</body>
+</html>

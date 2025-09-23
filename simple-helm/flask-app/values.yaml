@@ -1,0 +1,44 @@
+# Simple Flask App Configuration
+
+# Application
+appName: flask-health-app
+replicas: 2
+
+# Docker Image
+image:
+  repository: 084828598848.dkr.ecr.us-east-1.amazonaws.com/k8s-assessment
+  tag: latest
+
+# Service
+service:
+  type: ClusterIP
+  port: 80
+
+# Resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Environment Variables
+env:
+  FLASK_ENV: production
+  LOG_LEVEL: INFO
+  PORT: "5000"
+
+# Secrets (base64 encoded)
+secrets:
+  DATABASE_URL: cG9zdGdyZXNxbDovL3VzZXI6cGFzc3dvcmRAZGI6NTQzMi9mbGFza2FwcA==
+  SECRET_KEY: bXktc3VwZXItc2VjcmV0LWtleS1mb3ItZmxhc2stYXBw
+
+# Enable features
+hpa:
+  enabled: true
+  cpuTarget: 50
+
+ingress:
+  enabled: true
+  host: flask.yimo.world
