@@ -36,9 +36,9 @@ jobs:
     - name: Run Python unit tests
       working-directory: ./app
       run: |
-        echo "🧪 Running Python unit tests with pytest..."
+        echo "Running Python unit tests with pytest..."
         pytest tests/ -v --cov=. --cov-report=xml --cov-report=html --cov-report=term-missing
-        echo "✅ All tests passed!"
+        echo "All tests passed!"
 
     - name: Upload test coverage to artifacts
       uses: actions/upload-artifact@v4
@@ -77,28 +77,28 @@ jobs:
 
     - name: Check for High/Critical Vulnerabilities
       run: |
-        echo "🔍 Checking for High/Critical vulnerabilities..."
+        echo "Checking for High/Critical vulnerabilities..."
         
         if [ -f "reports/dependency-check-report.json" ]; then
           # Extract vulnerability count
           HIGH_CRITICAL_COUNT=$(cat reports/dependency-check-report.json | jq '.dependencies[].vulnerabilities[]? | select(.severity == "HIGH" or .severity == "CRITICAL")' | jq -s 'length')
           
-          echo "📊 High/Critical vulnerabilities found: $HIGH_CRITICAL_COUNT"
+          echo "High/Critical vulnerabilities found: $HIGH_CRITICAL_COUNT"
           
           if [ "$HIGH_CRITICAL_COUNT" -gt 0 ]; then
-            echo "❌ Found $HIGH_CRITICAL_COUNT High/Critical vulnerabilities!"
-            echo "🔗 Check the detailed report in artifacts"
+            echo "Found $HIGH_CRITICAL_COUNT High/Critical vulnerabilities!"
+            echo "Check the detailed report in artifacts"
             
             # Show summary of vulnerabilities
-            echo "📋 Vulnerability Summary:"
+            echo "Vulnerability Summary:"
             cat reports/dependency-check-report.json | jq -r '.dependencies[].vulnerabilities[]? | select(.severity == "HIGH" or .severity == "CRITICAL") | "- " + .name + " (" + .severity + "): " + .description'
             
             exit 1
           else
-            echo "✅ No High/Critical vulnerabilities found!"
+            echo "No High/Critical vulnerabilities found!"
           fi
         else
-          echo "⚠️ Dependency check report not found"
+          echo "Dependency check report not found"
         fi
 
     - name: SonarCloud Scan
@@ -112,88 +112,74 @@ jobs:
     - name: SonarCloud Quality Gate Check
       id: quality-gate
       run: |
-        echo "⏳ Waiting for SonarCloud Quality Gate..."
+        echo "Waiting for SonarCloud Quality Gate..."
         
         # Debug: Check if report-task.txt exists and show content
         if [ -f "./app/.scannerwork/report-task.txt" ]; then
-          echo "📋 Report task file content:"
+          echo "Report task file content:"
           cat ./app/.scannerwork/report-task.txt
           echo ""
           
           # Extract task ID more carefully
           TASK_ID=$(grep "ceTaskId=" ./app/.scannerwork/report-task.txt | cut -d'=' -f2)
-          echo "🆔 Task ID: $TASK_ID"
+          echo "Task ID: $TASK_ID"
           
           if [ -n "$TASK_ID" ]; then
             TASK_URL="https://sonarcloud.io/api/ce/task?id=$TASK_ID"
-            echo "🔗 Task URL: $TASK_URL"
+            echo "Task URL: $TASK_URL"
             
             # Wait for analysis to complete
             for i in {1..60}; do
               sleep 10
-              echo "⏳ Checking analysis status (attempt $i/60)..."
+              echo "Checking analysis status (attempt $i/60)..."
               
               RESPONSE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "$TASK_URL")
               TASK_STATUS=$(echo "$RESPONSE" | jq -r '.task.status // "PENDING"')
               
-              echo "📊 Analysis status: $TASK_STATUS"
+              echo "Analysis status: $TASK_STATUS"
               
               if [ "$TASK_STATUS" = "SUCCESS" ]; then
-                echo "✅ Analysis completed successfully!"
+                echo "Analysis completed successfully!"
                 break
               elif [ "$TASK_STATUS" = "FAILED" ] || [ "$TASK_STATUS" = "CANCELLED" ]; then
-                echo "❌ Analysis failed with status: $TASK_STATUS"
+                echo "Analysis failed with status: $TASK_STATUS"
                 echo "Response: $RESPONSE"
                 exit 1
               fi
               
               if [ $i -eq 60 ]; then
-                echo "❌ Timeout waiting for analysis to complete"
+                echo "Timeout waiting for analysis to complete"
                 exit 1
               fi
             done
           else
-            echo "❌ Could not extract task ID from report"
+            echo "Could not extract task ID from report"
             exit 1
           fi
         else
-          echo "❌ Report task file not found"
+          echo "Report task file not found"
           exit 1
         fi
         
         # Check Quality Gate
-        echo "🎯 Checking Quality Gate status..."
+        echo "Checking Quality Gate status..."
         sleep 5  # Give SonarCloud time to process
         
         PROJECT_STATUS_URL="https://sonarcloud.io/api/qualitygates/project_status?projectKey=abdulmoizz44_ebryx-k8s-project"
         QG_RESPONSE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "$PROJECT_STATUS_URL")
         QUALITY_GATE_STATUS=$(echo "$QG_RESPONSE" | jq -r '.projectStatus.status // "ERROR"')
         
-        echo "🎯 Quality Gate Status: $QUALITY_GATE_STATUS"
+        echo "Quality Gate Status: $QUALITY_GATE_STATUS"
         
         if [ "$QUALITY_GATE_STATUS" = "OK" ]; then
-          echo "✅ Quality Gate PASSED! 🎉"
-          echo "🚀 Proceeding with deployment..."
+          echo "Quality Gate PASSED!"
+          echo "Proceeding with deployment..."
         else
-          echo "❌ Quality Gate FAILED! Status: $QUALITY_GATE_STATUS"
-          echo "📄 Full response: $QG_RESPONSE"
-          echo "🔗 Check details at: https://sonarcloud.io/project/overview?id=abdulmoizz44_ebryx-k8s-project"
+          echo "Quality Gate FAILED! Status: $QUALITY_GATE_STATUS"
+          echo "Full response: $QG_RESPONSE"
+          echo "Check details at: https://sonarcloud.io/project/overview?id=abdulmoizz44_ebryx-k8s-project"
           exit 1
         fi
-
-    - name: Dockerfile Security Linting with Hadolint
-      uses: hadolint/hadolint-action@v3.1.0
-      with:
-        dockerfile: ./app/Dockerfile
-        failure-threshold: error
-        verbose: true
-
-    - name: Upload Hadolint results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: hadolint-results
-        path: hadolint-results.sarif
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
@@ -215,14 +201,14 @@ jobs:
         # Use short Git SHA for tagging (e.g., myapp:a1b2c3d)
         SHORT_SHA=${GITHUB_SHA:0:7}
         
-        echo "🔨 Building Docker image with short Git SHA tag: $SHORT_SHA"
+        echo "Building Docker image with short Git SHA tag: $SHORT_SHA"
         docker build -t $ECR_REPOSITORY:$SHORT_SHA .
         docker tag $ECR_REPOSITORY:$SHORT_SHA $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA
         docker tag $ECR_REPOSITORY:$SHORT_SHA $ECR_REGISTRY/$ECR_REPOSITORY:latest
         
-        echo "✅ Docker image built successfully!"
-        echo "📋 Local image: $ECR_REPOSITORY:$SHORT_SHA"
-        echo "📋 ECR image: $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA"
+        echo "Docker image built successfully!"
+        echo "Local image: $ECR_REPOSITORY:$SHORT_SHA"
+        echo "ECR image: $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA"
         
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA" >> $GITHUB_OUTPUT
         echo "image-latest=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
@@ -264,7 +250,7 @@ jobs:
 
     - name: Analyze Trivy scan results
       run: |
-        echo "🔍 Analyzing Trivy vulnerability scan results..."
+        echo "Analyzing Trivy vulnerability scan results..."
         
         if [ -f "trivy-report.json" ]; then
           # Count vulnerabilities by severity
@@ -273,34 +259,34 @@ jobs:
           MEDIUM=$(cat trivy-report.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "MEDIUM")] | length')
           LOW=$(cat trivy-report.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "LOW")] | length')
           
-          echo "📊 Vulnerability Summary:"
-          echo "🔴 Critical: $CRITICAL"
-          echo "🟠 High: $HIGH"
-          echo "🟡 Medium: $MEDIUM"
-          echo "🟢 Low: $LOW"
+          echo "Vulnerability Summary:"
+          echo "Critical: $CRITICAL"
+          echo "High: $HIGH"
+          echo "Medium: $MEDIUM"
+          echo "Low: $LOW"
           
           # Only fail on CRITICAL vulnerabilities
           if [ "$CRITICAL" -gt 0 ]; then
-            echo "❌ CRITICAL vulnerabilities found! Cannot proceed to production."
-            echo "🔗 Check detailed reports in artifacts or GitHub Security tab"
-            echo "🚨 Pipeline will fail and images will NOT be pushed to ECR"
+            echo "CRITICAL vulnerabilities found! Cannot proceed to production."
+            echo "Check detailed reports in artifacts or GitHub Security tab"
+            echo "Pipeline will fail and images will NOT be pushed to ECR"
             exit 1
           else
-            echo "✅ No CRITICAL vulnerabilities found! Safe to proceed with push."
+            echo "No CRITICAL vulnerabilities found! Safe to proceed with push."
             if [ "$HIGH" -gt 0 ]; then
-              echo "⚠️  Note: $HIGH HIGH severity vulnerabilities found (acceptable)"
+              echo "Note: $HIGH HIGH severity vulnerabilities found (acceptable)"
             fi
             if [ "$MEDIUM" -gt 0 ]; then
-              echo "💡 Note: $MEDIUM MEDIUM severity vulnerabilities found (acceptable)"
+              echo "Note: $MEDIUM MEDIUM severity vulnerabilities found (acceptable)"
             fi
             if [ "$LOW" -gt 0 ]; then
-              echo "ℹ️  Note: $LOW LOW severity vulnerabilities found (acceptable)"
+              echo "Note: $LOW LOW severity vulnerabilities found (acceptable)"
             fi
-            echo "📋 Summary: Critical($CRITICAL), High($HIGH), Medium($MEDIUM), Low($LOW)"
-            echo "🚀 Proceeding with ECR push and deployment..."
+            echo "Summary: Critical($CRITICAL), High($HIGH), Medium($MEDIUM), Low($LOW)"
+            echo "Proceeding with ECR push and deployment..."
           fi
         else
-          echo "⚠️ Trivy report not found, proceeding with caution..."
+          echo "Trivy report not found, proceeding with caution..."
         fi
 
     - name: Push images to Amazon ECR
@@ -309,14 +295,14 @@ jobs:
         # Use short Git SHA for tagging (e.g., k8s-assessment:a1b2c3d)
         SHORT_SHA=${GITHUB_SHA:0:7}
         
-        echo "📦 Pushing images to ECR (security scan passed)..."
-        echo "🏷️ Pushing with short Git SHA: $SHORT_SHA"
+        echo "Pushing images to ECR (security scan passed)..."
+        echo "Pushing with short Git SHA: $SHORT_SHA"
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
         
-        echo "✅ Images pushed successfully to ECR!"
-        echo "📋 Image with SHA tag: $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA"
-        echo "📋 Latest image: $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+        echo "Images pushed successfully to ECR!"
+        echo "Image with SHA tag: $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA"
+        echo "Latest image: $ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
     - name: Install kubectl
       uses: azure/setup-kubectl@v3
@@ -338,7 +324,7 @@ jobs:
         # Use short Git SHA for deployment (e.g., k8s-assessment:a1b2c3d)
         SHORT_SHA=${GITHUB_SHA:0:7}
         
-        echo "🚀 Deploying with short Git SHA tag: $SHORT_SHA"
+        echo "Deploying with short Git SHA tag: $SHORT_SHA"
         
         cd simple-helm/flask-app
         

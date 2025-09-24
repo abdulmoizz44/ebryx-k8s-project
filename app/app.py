@@ -1,12 +1,36 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import os
+import logging
 from datetime import datetime
+import sys
 
 app = Flask(__name__)
+
+# Configure logging for HTTP access logs
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
+
+# Create custom logger for access logs
+access_logger = logging.getLogger('werkzeug')
+access_logger.setLevel(logging.INFO)
 
 # Application state to simulate readiness
 app_ready = True
 app_alive = True
+
+@app.after_request
+def log_request(response):
+    """Log HTTP access details in a structured format"""
+    access_logger.info(
+        f'{request.remote_addr} - - [{datetime.now().strftime("%d/%b/%Y:%H:%M:%S %z")}] '
+        f'"{request.method} {request.full_path if request.query_string else request.path} HTTP/1.1" '
+        f'{response.status_code} {response.content_length or "-"} '
+        f'"{request.headers.get("Referer", "-")}" "{request.headers.get("User-Agent", "-")}"'
+    )
+    return response
 
 @app.route('/')
 def index():
