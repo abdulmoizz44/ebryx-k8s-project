@@ -350,11 +350,5 @@ jobs:
           --wait \
           --timeout=300s
         
-        echo "✅ Deployment completed successfully!"
-        echo "📋 Deployed image: $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA"
-        
-        # Verify deployment
-        kubectl get pods -l app=flask-health-app
-        kubectl get services flask-health-app
-
+        echo "Deployment completed successfully!"
         
